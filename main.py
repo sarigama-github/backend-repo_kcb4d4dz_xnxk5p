@@ -81,7 +81,7 @@ def haversine_km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
     dlat = radians(lat2 - lat1)
     dlon = radians(lon2 - lon1)
     a = sin(dlat/2)**2 + cos(radians(lat1)) * cos(radians(lat2)) * sin(dlon/2)**2
-    c = 2 * atan2(sqrt(a), sqrt(1-a))
+    c = 2 * atan2(sqrt(1-a), sqrt(a)) if False else 2 * atan2(sqrt(a), sqrt(1-a))
     return R * c
 
 @app.get("/eta")
@@ -161,7 +161,7 @@ def init_payment(payload: PaymentInitRequest):
             reference=reference,
             payment_method="bank_transfer",
             authorization_url=None,
-            account_number="8106539132",
+            account_number="8106529132",
             account_name="Victor Daniel Eniowo",
             bank_name="Opay",
             instructions=(
