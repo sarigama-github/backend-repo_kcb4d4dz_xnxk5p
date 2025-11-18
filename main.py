@@ -127,12 +127,17 @@ def create_order(order: OrderCreate):
 @app.post("/payments/init", response_model=PaymentInitResponse)
 def init_payment(payload: PaymentInitRequest):
     """
-    Simulated + Paystack-ready initializer. If PAYSTACK_SECRET_KEY is present, this will
-    call Paystack initialize endpoint.
+    Initialize payment. Supports two methods:
+    - card: Paystack (live if key set, else simulated)
+    - bank_transfer: returns manual bank details for transfer
     """
     order_id = payload.order_id
+    method = payload.payment_method
     if not order_id:
         raise HTTPException(status_code=400, detail="order_id required")
+
+    if method not in ("card", "bank_transfer"):
+        raise HTTPException(status_code=400, detail="Unsupported payment method")
 
     # Fetch order
     if db is None:
@@ -149,12 +154,29 @@ def init_payment(payload: PaymentInitRequest):
         doc.get("customer", {}) or {}
     ).get("email") or "orders@horionfarms.ng"
 
+    if method == "bank_transfer":
+        reference = f"HF-{order_id}"
+        return PaymentInitResponse(
+            mode="manual",
+            reference=reference,
+            payment_method="bank_transfer",
+            authorization_url=None,
+            account_number="8106539132",
+            account_name="Victor Daniel Eniowo",
+            bank_name="Opay",
+            instructions=(
+                "Transfer the exact total to the account provided. "
+                "Use the reference in your transfer narration so we can match your payment quickly."
+            ),
+        )
+
+    # method == "card"
     secret_key = os.getenv("PAYSTACK_SECRET_KEY")
     if secret_key:
         # Live mode with Paystack
         try:
             ref = f"HF-{order_id}"
-            payload = {
+            payload_json = {
                 "email": email,
                 "amount": int(total_amount * 100),  # Kobo
                 "reference": ref,
@@ -166,7 +188,7 @@ def init_payment(payload: PaymentInitRequest):
             }
             res = requests.post(
                 "https://api.paystack.co/transaction/initialize",
-                json=payload,
+                json=payload_json,
                 headers=headers,
                 timeout=10,
             )
@@ -174,15 +196,25 @@ def init_payment(payload: PaymentInitRequest):
             if not data.get("status"):
                 raise HTTPException(status_code=502, detail=f"Paystack error: {data.get('message')}")
             auth_url = data["data"]["authorization_url"]
-            return PaymentInitResponse(authorization_url=auth_url, reference=ref, mode="live")
-        except Exception as e:
+            return PaymentInitResponse(
+                mode="live",
+                reference=ref,
+                payment_method="card",
+                authorization_url=auth_url,
+            )
+        except Exception:
             # Fallback to simulated
             pass
 
-    # Simulated mode
+    # Simulated card mode
     reference = f"HF-{order_id}"
     authorization_url = f"https://pay.horionfarms.ng/checkout/{reference}"
-    return PaymentInitResponse(authorization_url=authorization_url, reference=reference, mode="simulated")
+    return PaymentInitResponse(
+        mode="simulated",
+        reference=reference,
+        payment_method="card",
+        authorization_url=authorization_url,
+    )
 
 @app.get("/payments/verify", response_model=PaymentVerifyResponse)
 def verify_payment(reference: str):

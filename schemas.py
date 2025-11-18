@@ -12,7 +12,7 @@ Model name is converted to lowercase for the collection name:
 """
 
 from pydantic import BaseModel, Field, EmailStr
-from typing import Optional, List
+from typing import Optional, List, Literal
 
 # Example schemas (replace with your own):
 
@@ -71,11 +71,17 @@ class Order(BaseModel):
 
 class PaymentInitRequest(BaseModel):
     order_id: str
+    payment_method: Literal['card', 'bank_transfer'] = 'card'
 
 class PaymentInitResponse(BaseModel):
-    authorization_url: str
+    mode: str = Field(..., description="live|simulated|manual")
     reference: str
-    mode: str = Field(..., description="live or simulated")
+    payment_method: Literal['card', 'bank_transfer']
+    authorization_url: Optional[str] = None
+    account_number: Optional[str] = None
+    account_name: Optional[str] = None
+    bank_name: Optional[str] = None
+    instructions: Optional[str] = None
 
 class PaymentVerifyResponse(BaseModel):
     status: str
