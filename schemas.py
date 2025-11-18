@@ -11,8 +11,8 @@ Model name is converted to lowercase for the collection name:
 - BlogPost -> "blogs" collection
 """
 
-from pydantic import BaseModel, Field
-from typing import Optional
+from pydantic import BaseModel, Field, EmailStr
+from typing import Optional, List
 
 # Example schemas (replace with your own):
 
@@ -22,7 +22,7 @@ class User(BaseModel):
     Collection name: "user" (lowercase of class name)
     """
     name: str = Field(..., description="Full name")
-    email: str = Field(..., description="Email address")
+    email: EmailStr = Field(..., description="Email address")
     address: str = Field(..., description="Address")
     age: Optional[int] = Field(None, ge=0, le=120, description="Age in years")
     is_active: bool = Field(True, description="Whether user is active")
@@ -34,12 +34,54 @@ class Product(BaseModel):
     """
     title: str = Field(..., description="Product title")
     description: Optional[str] = Field(None, description="Product description")
-    price: float = Field(..., ge=0, description="Price in dollars")
+    price: float = Field(..., ge=0, description="Price in naira")
     category: str = Field(..., description="Product category")
     in_stock: bool = Field(True, description="Whether product is in stock")
 
-# Add your own schemas here:
-# --------------------------------------------------
+# Horion Farms — Orders & Payments
+
+class OrderItem(BaseModel):
+    name: str
+    unit_price: float = Field(..., ge=0)
+    quantity: int = Field(..., ge=1)
+
+class CustomerInfo(BaseModel):
+    name: str
+    email: EmailStr
+    phone: str
+    address: str
+    city: str
+
+class OrderCreate(BaseModel):
+    items: List[OrderItem]
+    customer: CustomerInfo
+    subtotal: float = Field(..., ge=0)
+    delivery_fee: float = Field(..., ge=0)
+    total: float = Field(..., ge=0)
+
+class Order(BaseModel):
+    items: List[OrderItem]
+    customer: CustomerInfo
+    subtotal: float
+    delivery_fee: float
+    total: float
+    currency: str = Field("NGN", description="Currency code")
+    status: str = Field("pending", description="Order status: pending|paid|failed|cancelled|fulfilled")
+    payment_reference: Optional[str] = None
+
+class PaymentInitRequest(BaseModel):
+    order_id: str
+
+class PaymentInitResponse(BaseModel):
+    authorization_url: str
+    reference: str
+    mode: str = Field(..., description="live or simulated")
+
+class PaymentVerifyResponse(BaseModel):
+    status: str
+    order_status: str
+    reference: str
+    paid: bool
 
 # Note: The Flames database viewer will automatically:
 # 1. Read these schemas from GET /schema endpoint
